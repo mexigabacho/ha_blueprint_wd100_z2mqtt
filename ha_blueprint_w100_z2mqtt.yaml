@@ -1,0 +1,532 @@
+blueprint:
+  name: Aqara W100 Thermostat & Button Controller (z2mqtt)
+  description: |
+    A comprehensive blueprint for the Aqara W100 Climate Sensor (via Zigbee2MQTT).
+    
+    Features:
+    - Bidirectional or unidirectional thermostat sync (HVAC mode, setpoint, fan mode)
+    - Fan mode translation between W100 (auto/low/medium/high) and on/off thermostats
+    - External temperature and humidity publishing to W100 display
+    - Full button action support (single and double press for all 3 buttons)
+    - In thermostat mode: only double press actions fire (single presses are used by native W100 UI)
+    - Outside thermostat mode: all button actions fire
+    
+    Setup:
+    - Set your W100 MQTT topic (found in Zigbee2MQTT device page)
+    - Select your W100 climate entity and main thermostat entity
+    - Choose sync direction
+    - Optionally assign actions to any button press
+  domain: automation
+
+  input:
+    # -------------------------
+    # Device Configuration
+    # -------------------------
+    mqtt_topic:
+      name: W100 MQTT Topic
+      description: >
+        The MQTT topic for your W100 device as configured in Zigbee2MQTT.
+        Example: zigbee2mqtt/Office-Climate-Controller
+      default: zigbee2mqtt/<your_device_name>
+      selector:
+        text:
+
+    aqara_w100:
+      name: Aqara W100 Climate Entity
+      description: The W100 climate entity in Home Assistant
+      selector:
+        entity:
+          domain: climate
+
+    main_thermostat:
+      name: Main Thermostat
+      description: The primary thermostat entity to sync with
+      selector:
+        entity:
+          domain: climate
+
+    # -------------------------
+    # Sync Configuration
+    # -------------------------
+    sync_direction:
+      name: Synchronization Direction
+      description: >
+        Controls which direction temperature and mode changes are synced.
+        Bidirectional keeps both devices in sync with each other.
+        Main thermostat as master means the W100 always follows the main thermostat.
+        W100 as master means the main thermostat always follows the W100.
+      default: bidirectional
+      selector:
+        select:
+          options:
+            - label: Bidirectional
+              value: bidirectional
+            - label: Main Thermostat is Master
+              value: main_to_w100
+            - label: W100 is Master
+              value: w100_to_main
+
+    sync_delay:
+      name: Synchronization Delay
+      description: Delay in seconds between sync commands to prevent race conditions
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+          unit_of_measurement: seconds
+
+    # -------------------------
+    # HVAC Mode Support
+    # -------------------------
+    hvac_has_heat:
+      name: Heating Support
+      description: Enable if your HVAC system supports heating mode
+      default: true
+      selector:
+        boolean:
+
+    hvac_has_cool:
+      name: Cooling Support
+      description: Enable if your HVAC system supports cooling mode
+      default: false
+      selector:
+        boolean:
+
+    hvac_has_auto:
+      name: Auto Mode Support
+      description: Enable if your HVAC system supports automatic mode
+      default: false
+      selector:
+        boolean:
+
+    # -------------------------
+    # Fan Mode Configuration
+    # -------------------------
+    fan_mode_translation:
+      name: Fan Mode Translation
+      description: >
+        Enable if your main thermostat only supports on/off fan mode but your
+        W100 supports auto/low/medium/high. When enabled, W100 auto maps to
+        off and low/medium/high map to on, and vice versa.
+      default: false
+      selector:
+        boolean:
+
+    # -------------------------
+    # External Sensor Configuration
+    # -------------------------
+    enable_external_data:
+      name: Enable External Data Publishing
+      description: Publish external temperature and humidity to W100 display
+      default: false
+      selector:
+        boolean:
+
+    external_temperature_sensor:
+      name: External Temperature Sensor
+      description: Temperature sensor to publish to W100 bottom display section (optional)
+      default: []
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+
+    external_humidity_sensor:
+      name: External Humidity Sensor
+      description: Humidity sensor to publish to W100 bottom display section (optional)
+      default: []
+      selector:
+        entity:
+          domain: sensor
+          device_class: humidity
+
+    # -------------------------
+    # Button Actions
+    # Note: Single press actions only fire when thermostat mode is OFF.
+    # In thermostat mode, single presses are used by the W100 native UI.
+    # Double press actions fire regardless of thermostat mode.
+    # -------------------------
+    single_plus_action:
+      name: Single + Press
+      description: >
+        Action to run when + is pressed once.
+        Only fires when thermostat mode is OFF.
+      default: []
+      selector:
+        action: {}
+
+    single_minus_action:
+      name: Single - Press
+      description: >
+        Action to run when - is pressed once.
+        Only fires when thermostat mode is OFF.
+      default: []
+      selector:
+        action: {}
+
+    single_center_action:
+      name: Single Center Press
+      description: >
+        Action to run when center button is pressed once.
+        Only fires when thermostat mode is OFF.
+      default: []
+      selector:
+        action: {}
+
+    double_plus_action:
+      name: Double + Press
+      description: >
+        Action to run when + is pressed twice.
+        Fires regardless of thermostat mode.
+      default: []
+      selector:
+        action: {}
+
+    double_minus_action:
+      name: Double - Press
+      description: >
+        Action to run when - is pressed twice.
+        Fires regardless of thermostat mode.
+      default: []
+      selector:
+        action: {}
+
+    double_center_action:
+      name: Double Center Press
+      description: >
+        Action to run when center button is pressed twice.
+        Fires regardless of thermostat mode.
+      default: []
+      selector:
+        action: {}
+
+# -------------------------
+# Variables
+# -------------------------
+variables:
+  aqara_w100: !input aqara_w100
+  main_thermostat: !input main_thermostat
+  sync_direction: !input sync_direction
+  sync_delay: !input sync_delay
+  hvac_has_heat: !input hvac_has_heat
+  hvac_has_cool: !input hvac_has_cool
+  hvac_has_auto: !input hvac_has_auto
+  fan_mode_translation: !input fan_mode_translation
+  enable_external_data: !input enable_external_data
+  external_temperature_sensor: !input external_temperature_sensor
+  external_humidity_sensor: !input external_humidity_sensor
+  thermostat_mode_switch: >-
+    {{ 'switch.' ~ aqara_w100.split('.')[1] ~ '_thermostat_mode' }}
+
+# -------------------------
+# Triggers
+# -------------------------
+triggers:
+  # Button press actions via MQTT
+  - trigger: mqtt
+    topic: "{{ mqtt_topic }}/action"
+    id: button_action
+
+  # Main thermostat state changes
+  - trigger: state
+    entity_id: !input main_thermostat
+    id: main_thermostat_state
+
+  # W100 state changes
+  - trigger: state
+    entity_id: !input aqara_w100
+    id: w100_state
+
+  # External sensor changes
+  - trigger: state
+    entity_id: !input external_temperature_sensor
+    id: ext_temp
+    enabled: !input enable_external_data
+
+  - trigger: state
+    entity_id: !input external_humidity_sensor
+    id: ext_hum
+    enabled: !input enable_external_data
+
+conditions: []
+
+# -------------------------
+# Actions
+# -------------------------
+actions:
+  - choose:
+
+      # ------------------------------------------------------------------ #
+      # BRANCH 1: Button Actions                                            #
+      # Double press: always fires                                          #
+      # Single press: only fires when thermostat mode is OFF               #
+      # ------------------------------------------------------------------ #
+      - conditions:
+          - condition: trigger
+            id: button_action
+        sequence:
+          - choose:
+              # --- Double Press Actions (always fire) ---
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.payload == 'double_plus' }}"
+                sequence: !input double_plus_action
+
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.payload == 'double_minus' }}"
+                sequence: !input double_minus_action
+
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.payload == 'double_center' }}"
+                sequence: !input double_center_action
+
+              # --- Single Press Actions (only fire when thermostat mode is OFF) ---
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ trigger.payload == 'single_plus' and
+                         is_state(thermostat_mode_switch, 'off') }}
+                sequence: !input single_plus_action
+
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ trigger.payload == 'single_minus' and
+                         is_state(thermostat_mode_switch, 'off') }}
+                sequence: !input single_minus_action
+
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ trigger.payload == 'single_center' and
+                         is_state(thermostat_mode_switch, 'off') }}
+                sequence: !input single_center_action
+
+      # ------------------------------------------------------------------ #
+      # BRANCH 2: Main Thermostat → W100                                   #
+      # Fires when main thermostat changes                                  #
+      # Skipped if sync direction is w100_to_main                          #
+      # ------------------------------------------------------------------ #
+      - conditions:
+          - condition: trigger
+            id: main_thermostat_state
+          - condition: template
+            value_template: >-
+              {{ sync_direction in ['bidirectional', 'main_to_w100'] and
+                 is_state(thermostat_mode_switch, 'on') }}
+        sequence:
+          # Sync HVAC mode
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ states(main_thermostat) != states(aqara_w100) }}
+            then:
+              - action: climate.set_hvac_mode
+                target:
+                  entity_id: !input aqara_w100
+                data:
+                  hvac_mode: "{{ states(main_thermostat) }}"
+              - delay:
+                  seconds: "{{ sync_delay }}"
+
+          # Sync temperature setpoint
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ state_attr(main_thermostat, 'temperature') !=
+                     state_attr(aqara_w100, 'temperature') }}
+            then:
+              - action: climate.set_temperature
+                target:
+                  entity_id: !input aqara_w100
+                data:
+                  temperature: "{{ state_attr(main_thermostat, 'temperature') }}"
+              - delay:
+                  seconds: "{{ sync_delay }}"
+
+          # Sync fan mode with optional translation
+          - if:
+              - condition: template
+                value_template: >-
+                  {% set source = state_attr(main_thermostat, 'fan_mode') | lower %}
+                  {% set target = state_attr(aqara_w100, 'fan_mode') | lower %}
+                  {% set source_norm = 'medium' if source == 'med' else source %}
+                  {{ source_norm != target }}
+            then:
+              - action: climate.set_fan_mode
+                target:
+                  entity_id: !input aqara_w100
+                data:
+                  fan_mode: >-
+                    {% set source = state_attr(main_thermostat, 'fan_mode') | lower %}
+                    {% if fan_mode_translation | bool %}
+                      {# Translate on/off → W100 fan modes #}
+                      {% if source == 'on' %}
+                        medium
+                      {% else %}
+                        auto
+                      {% endif %}
+                    {% else %}
+                      {# Normalize med → medium #}
+                      {% if source == 'med' %}
+                        medium
+                      {% else %}
+                        {{ source }}
+                      {% endif %}
+                    {% endif %}
+              - delay:
+                  seconds: "{{ sync_delay }}"
+
+      # ------------------------------------------------------------------ #
+      # BRANCH 3: W100 → Main Thermostat                                   #
+      # Fires when W100 changes                                             #
+      # Skipped if sync direction is main_to_w100                          #
+      # ------------------------------------------------------------------ #
+      - conditions:
+          - condition: trigger
+            id: w100_state
+          - condition: template
+            value_template: >-
+              {{ sync_direction in ['bidirectional', 'w100_to_main'] and
+                 is_state(thermostat_mode_switch, 'on') }}
+        sequence:
+          # Sync HVAC mode with supported mode check
+          - if:
+              - condition: template
+                value_template: >-
+                  {{
+                    (states(main_thermostat) != states(aqara_w100)) and
+                    (
+                      (is_state(aqara_w100, 'heat') and (hvac_has_heat | bool)) or
+                      (is_state(aqara_w100, 'cool') and (hvac_has_cool | bool)) or
+                      (is_state(aqara_w100, 'auto') and (hvac_has_auto | bool)) or
+                      (is_state(aqara_w100, 'off'))
+                    )
+                  }}
+            then:
+              - action: climate.set_hvac_mode
+                target:
+                  entity_id: !input main_thermostat
+                data:
+                  hvac_mode: "{{ states(aqara_w100) }}"
+              - delay:
+                  seconds: "{{ sync_delay }}"
+            else:
+              # If W100 is in an unsupported mode, revert it to the first supported mode
+              - if:
+                  - condition: template
+                    value_template: >-
+                      {{
+                        (is_state(aqara_w100, 'heat') and not (hvac_has_heat | bool)) or
+                        (is_state(aqara_w100, 'cool') and not (hvac_has_cool | bool)) or
+                        (is_state(aqara_w100, 'auto') and not (hvac_has_auto | bool))
+                      }}
+                then:
+                  - action: climate.set_hvac_mode
+                    target:
+                      entity_id: !input aqara_w100
+                    data:
+                      hvac_mode: >-
+                        {% if hvac_has_heat | bool %}
+                          heat
+                        {% elif hvac_has_cool | bool %}
+                          cool
+                        {% else %}
+                          off
+                        {% endif %}
+                  - delay:
+                      seconds: "{{ sync_delay }}"
+
+          # Sync temperature setpoint
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ state_attr(main_thermostat, 'temperature') !=
+                     state_attr(aqara_w100, 'temperature') }}
+            then:
+              - action: climate.set_temperature
+                target:
+                  entity_id: !input main_thermostat
+                data:
+                  temperature: "{{ state_attr(aqara_w100, 'temperature') }}"
+              - delay:
+                  seconds: "{{ sync_delay }}"
+
+          # Sync fan mode with optional translation
+          - if:
+              - condition: template
+                value_template: >-
+                  {% set source = state_attr(aqara_w100, 'fan_mode') | lower %}
+                  {% set target = state_attr(main_thermostat, 'fan_mode') | lower %}
+                  {% set source_norm = 'medium' if source == 'med' else source %}
+                  {{ source_norm != target }}
+            then:
+              - action: climate.set_fan_mode
+                target:
+                  entity_id: !input main_thermostat
+                data:
+                  fan_mode: >-
+                    {% set source = state_attr(aqara_w100, 'fan_mode') | lower %}
+                    {% if fan_mode_translation | bool %}
+                      {# Translate W100 fan modes → on/off #}
+                      {% if source in ['low', 'medium', 'high'] %}
+                        on
+                      {% else %}
+                        off
+                      {% endif %}
+                    {% else %}
+                      {# Find matching fan mode from main thermostat's valid list #}
+                      {% set valid_modes = state_attr(main_thermostat, 'fan_modes') %}
+                      {% if source in ['med', 'medium'] %}
+                        {{ valid_modes | select('search', '(?i)^med') | first | default(source) }}
+                      {% else %}
+                        {{ source }}
+                      {% endif %}
+                    {% endif %}
+              - delay:
+                  seconds: "{{ sync_delay }}"
+
+      # ------------------------------------------------------------------ #
+      # BRANCH 4: External Sensors → W100 Display                          #
+      # Pushes temp and humidity to W100 bottom display section            #
+      # ------------------------------------------------------------------ #
+      - conditions:
+          - condition: trigger
+            id:
+              - ext_temp
+              - ext_hum
+          - condition: template
+            value_template: "{{ enable_external_data }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ states(external_temperature_sensor) not in ['unknown', 'unavailable'] }}
+            then:
+              - action: mqtt.publish
+                data:
+                  topic: "{{ mqtt_topic }}/set"
+                  payload: >-
+                    {{ {'external_temperature': states(external_temperature_sensor) | float} | tojson }}
+              - delay:
+                  seconds: "{{ sync_delay }}"
+
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ states(external_humidity_sensor) not in ['unknown', 'unavailable'] }}
+            then:
+              - action: mqtt.publish
+                data:
+                  topic: "{{ mqtt_topic }}/set"
+                  payload: >-
+                    {{ {'external_humidity': states(external_humidity_sensor) | float} | tojson }}
+              - delay:
+                  seconds: "{{ sync_delay }}"
+
+mode: queued
+max: 10
