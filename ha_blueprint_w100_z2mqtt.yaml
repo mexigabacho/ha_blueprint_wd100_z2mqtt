@@ -1,5 +1,5 @@
 blueprint:
-  name: Aqara W100 Thermostat & Button Controller (z2mqtt)
+  name: Aqara W100 Thermostat & Button Controller
   description: |
     A comprehensive blueprint for the Aqara W100 Climate Sensor (via Zigbee2MQTT).
     
@@ -26,7 +26,7 @@ blueprint:
       name: W100 MQTT Topic
       description: >
         The MQTT topic for your W100 device as configured in Zigbee2MQTT.
-        Example: zigbee2mqtt/Office-Climate-Controller
+        Example: zigbee2mqtt/WD100-Device-Name
       default: zigbee2mqtt/<your_device_name>
       selector:
         text:
@@ -225,8 +225,9 @@ variables:
 # -------------------------
 triggers:
   # Button press actions via MQTT
+  # Note: topic must use !input directly - Jinja2 templates are not supported in trigger topics
   - trigger: mqtt
-    topic: "{{ mqtt_topic }}/action"
+    topic: !input mqtt_topic
     id: button_action
 
   # Main thermostat state changes
@@ -271,38 +272,38 @@ actions:
               # --- Double Press Actions (always fire) ---
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.payload == 'double_plus' }}"
+                    value_template: "{{ trigger.payload_json.action == 'double_plus' }}"
                 sequence: !input double_plus_action
 
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.payload == 'double_minus' }}"
+                    value_template: "{{ trigger.payload_json.action == 'double_minus' }}"
                 sequence: !input double_minus_action
 
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.payload == 'double_center' }}"
+                    value_template: "{{ trigger.payload_json.action == 'double_center' }}"
                 sequence: !input double_center_action
 
               # --- Single Press Actions (only fire when thermostat mode is OFF) ---
               - conditions:
                   - condition: template
                     value_template: >-
-                      {{ trigger.payload == 'single_plus' and
+                      {{ trigger.payload_json.action == 'single_plus' and
                          is_state(thermostat_mode_switch, 'off') }}
                 sequence: !input single_plus_action
 
               - conditions:
                   - condition: template
                     value_template: >-
-                      {{ trigger.payload == 'single_minus' and
+                      {{ trigger.payload_json.action == 'single_minus' and
                          is_state(thermostat_mode_switch, 'off') }}
                 sequence: !input single_minus_action
 
               - conditions:
                   - condition: template
                     value_template: >-
-                      {{ trigger.payload == 'single_center' and
+                      {{ trigger.payload_json.action == 'single_center' and
                          is_state(thermostat_mode_switch, 'off') }}
                 sequence: !input single_center_action
 
@@ -509,7 +510,7 @@ actions:
             then:
               - action: mqtt.publish
                 data:
-                  topic: "{{ mqtt_topic }}/set"
+                  topic: "{{ mqtt_topic ~ '/set' }}"
                   payload: >-
                     {{ {'external_temperature': states(external_temperature_sensor) | float} | tojson }}
               - delay:
@@ -522,7 +523,7 @@ actions:
             then:
               - action: mqtt.publish
                 data:
-                  topic: "{{ mqtt_topic }}/set"
+                  topic: "{{ mqtt_topic ~ '/set' }}"
                   payload: >-
                     {{ {'external_humidity': states(external_humidity_sensor) | float} | tojson }}
               - delay:
