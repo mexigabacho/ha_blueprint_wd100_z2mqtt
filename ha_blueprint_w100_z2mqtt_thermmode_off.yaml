@@ -1,0 +1,627 @@
+blueprint:
+  name: Aqara W100 Button Controller (Thermostat Mode OFF)
+  description: |
+    Button controller for the Aqara W100 Climate Sensor (via Zigbee2MQTT).
+    Requires thermostat mode to be OFF on the W100 device.
+    
+    Features:
+    - 3 user-configurable modes: ceiling_fan, hvac_set, custom
+    - Center button cycles through modes
+    - Double center returns to default mode
+    - hvac_set mode controls thermostat setpoint with +/- buttons
+    - hvac_set mode flashes bottom humidity display while active
+    - Inactivity timer returns to default mode automatically
+    - External temperature and humidity publishing to W100 bottom display
+    
+    Required Helpers (create before using this blueprint):
+    - input_select: Create a helper with your mode names
+      Example options: ceiling_fan, hvac_set, custom
+    - timer: Create a timer helper for inactivity timeout
+    
+    Setup:
+    1. Create an input_select helper with your 3 mode names
+    2. Create a timer helper
+    3. Set your W100 MQTT topic
+    4. Select your W100 climate entity and main thermostat
+    5. Set your default mode (must match a value in your input_select)
+    6. Assign actions to ceiling_fan and custom mode buttons
+  domain: automation
+
+  input:
+    # -------------------------
+    # Device Configuration
+    # -------------------------
+    mqtt_topic:
+      name: W100 MQTT Topic
+      description: >
+        The base MQTT topic for your W100 device as configured in Zigbee2MQTT.
+        Example: zigbee2mqtt/Office-Climate-Controller
+      default: zigbee2mqtt/<your_device_name>
+      selector:
+        text:
+
+    aqara_w100:
+      name: Aqara W100 Climate Entity
+      description: The W100 climate entity in Home Assistant
+      selector:
+        entity:
+          domain: climate
+
+    main_thermostat:
+      name: Main Thermostat
+      description: The primary thermostat entity to control in hvac_set mode
+      selector:
+        entity:
+          domain: climate
+
+    # -------------------------
+    # Mode Configuration
+    # -------------------------
+    mode_selector:
+      name: Mode Selector Helper
+      description: >
+        An input_select helper that tracks the current mode.
+        Create a helper with options matching your mode names
+        (e.g. ceiling_fan, hvac_set, custom).
+      selector:
+        entity:
+          domain: input_select
+
+    mode_timer:
+      name: Mode Timer Helper
+      description: >
+        A timer helper for inactivity timeout.
+        When this timer expires the blueprint returns to default mode.
+        Set the timer duration in the helper itself.
+      selector:
+        entity:
+          domain: timer
+
+    default_mode:
+      name: Default Mode
+      description: >
+        The mode to use on startup and to return to after timeout or double
+        center press. Must exactly match one of the values in your
+        mode selector helper.
+        Example: ceiling_fan
+      default: ceiling_fan
+      selector:
+        text:
+
+    mode_timeout:
+      name: Mode Timeout
+      description: >
+        Seconds of inactivity before returning to default mode.
+        Also controls the flash duration for hvac_set mode.
+      default: 8
+      selector:
+        number:
+          min: 3
+          max: 30
+          step: 1
+          unit_of_measurement: seconds
+
+    # -------------------------
+    # hvac_set Mode Configuration
+    # -------------------------
+    hvac_set_flash:
+      name: Flash Display in HVAC Set Mode
+      description: >
+        When enabled, the bottom humidity display will flash between 0 and 88
+        while in hvac_set mode to indicate active setpoint adjustment.
+      default: true
+      selector:
+        boolean:
+
+    hvac_setpoint_step_single:
+      name: HVAC Setpoint Single Press Step
+      description: How many degrees to adjust setpoint on single + or - press
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 5
+          step: 1
+          unit_of_measurement: degrees
+
+    hvac_setpoint_step_double:
+      name: HVAC Setpoint Double Press Step
+      description: How many degrees to adjust setpoint on double + or - press
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+          unit_of_measurement: degrees
+
+    # -------------------------
+    # External Sensor Configuration
+    # -------------------------
+    external_temperature_sensor:
+      name: External Temperature Sensor
+      description: >
+        Temperature sensor to publish to W100 bottom display in normal modes.
+        Leave empty to disable.
+      default: []
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+
+    external_humidity_sensor:
+      name: External Humidity Sensor
+      description: >
+        Humidity sensor to publish to W100 bottom display in normal modes.
+        Leave empty to disable.
+      default: []
+      selector:
+        entity:
+          domain: sensor
+          device_class: humidity
+
+    # -------------------------
+    # Ceiling Fan Mode Button Actions
+    # -------------------------
+    ceiling_fan_single_plus:
+      name: "Ceiling Fan: Single + Press"
+      description: Action when + is pressed once in ceiling_fan mode
+      default: []
+      selector:
+        action: {}
+
+    ceiling_fan_single_minus:
+      name: "Ceiling Fan: Single - Press"
+      description: Action when - is pressed once in ceiling_fan mode
+      default: []
+      selector:
+        action: {}
+
+    ceiling_fan_double_plus:
+      name: "Ceiling Fan: Double + Press"
+      description: Action when + is pressed twice in ceiling_fan mode
+      default: []
+      selector:
+        action: {}
+
+    ceiling_fan_double_minus:
+      name: "Ceiling Fan: Double - Press"
+      description: Action when - is pressed twice in ceiling_fan mode
+      default: []
+      selector:
+        action: {}
+
+    # -------------------------
+    # Custom Mode Button Actions
+    # -------------------------
+    custom_single_plus:
+      name: "Custom: Single + Press"
+      description: Action when + is pressed once in custom mode
+      default: []
+      selector:
+        action: {}
+
+    custom_single_minus:
+      name: "Custom: Single - Press"
+      description: Action when - is pressed once in custom mode
+      default: []
+      selector:
+        action: {}
+
+    custom_double_plus:
+      name: "Custom: Double + Press"
+      description: Action when + is pressed twice in custom mode
+      default: []
+      selector:
+        action: {}
+
+    custom_double_minus:
+      name: "Custom: Double - Press"
+      description: Action when - is pressed twice in custom mode
+      default: []
+      selector:
+        action: {}
+
+# -------------------------
+# Variables
+# -------------------------
+variables:
+  mqtt_topic: !input mqtt_topic
+  aqara_w100: !input aqara_w100
+  main_thermostat: !input main_thermostat
+  mode_selector: !input mode_selector
+  mode_timer: !input mode_timer
+  default_mode: !input default_mode
+  mode_timeout: !input mode_timeout
+  hvac_set_flash: !input hvac_set_flash
+  hvac_setpoint_step_single: !input hvac_setpoint_step_single
+  hvac_setpoint_step_double: !input hvac_setpoint_step_double
+  external_temperature_sensor: !input external_temperature_sensor
+  external_humidity_sensor: !input external_humidity_sensor
+  current_mode: "{{ states(mode_selector) }}"
+  external_temp_entity: >-
+    {{ 'number.' ~ aqara_w100.split('.')[1] ~ '_external_temperature' }}
+  external_humi_entity: >-
+    {{ 'number.' ~ aqara_w100.split('.')[1] ~ '_external_humidity' }}
+
+# -------------------------
+# Triggers
+# -------------------------
+triggers:
+  # Button press actions via MQTT main topic
+  - trigger: mqtt
+    topic: !input mqtt_topic
+    value_template: "{{ value_json.action }}"
+    payload: single_plus
+    id: single_plus
+
+  - trigger: mqtt
+    topic: !input mqtt_topic
+    value_template: "{{ value_json.action }}"
+    payload: single_minus
+    id: single_minus
+
+  - trigger: mqtt
+    topic: !input mqtt_topic
+    value_template: "{{ value_json.action }}"
+    payload: double_plus
+    id: double_plus
+
+  - trigger: mqtt
+    topic: !input mqtt_topic
+    value_template: "{{ value_json.action }}"
+    payload: double_minus
+    id: double_minus
+
+  - trigger: mqtt
+    topic: !input mqtt_topic
+    value_template: "{{ value_json.action }}"
+    payload: single_center
+    id: single_center
+
+  - trigger: mqtt
+    topic: !input mqtt_topic
+    value_template: "{{ value_json.action }}"
+    payload: double_center
+    id: double_center
+
+  # Timer expiry — return to default mode
+  - trigger: state
+    entity_id: !input mode_timer
+    to: idle
+    id: timer_expired
+
+  # External sensor changes — update display in non-hvac_set modes
+  - trigger: state
+    entity_id: !input external_temperature_sensor
+    id: ext_temp
+
+  - trigger: state
+    entity_id: !input external_humidity_sensor
+    id: ext_hum
+
+conditions: []
+
+# -------------------------
+# Actions
+# -------------------------
+actions:
+  - choose:
+
+      # ------------------------------------------------------------------ #
+      # BRANCH 1: Double Center — Return to default mode immediately        #
+      # ------------------------------------------------------------------ #
+      - conditions:
+          - condition: trigger
+            id: double_center
+        sequence:
+          - action: timer.cancel
+            target:
+              entity_id: !input mode_timer
+          - action: input_select.select_option
+            target:
+              entity_id: !input mode_selector
+            data:
+              option: "{{ default_mode }}"
+          # Restore real external temp/humidity display
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ states(external_temperature_sensor) not in ['unknown', 'unavailable', ''] }}
+            then:
+              - action: number.set_value
+                target:
+                  entity_id: "{{ external_temp_entity }}"
+                data:
+                  value: "{{ states(external_temperature_sensor) | float }}"
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+            then:
+              - action: number.set_value
+                target:
+                  entity_id: "{{ external_humi_entity }}"
+                data:
+                  value: "{{ states(external_humidity_sensor) | float }}"
+
+      # ------------------------------------------------------------------ #
+      # BRANCH 2: Single Center — Cycle to next mode                       #
+      # ------------------------------------------------------------------ #
+      - conditions:
+          - condition: trigger
+            id: single_center
+        sequence:
+          # Restart inactivity timer
+          - action: timer.start
+            target:
+              entity_id: !input mode_timer
+            data:
+              duration: "{{ mode_timeout }}"
+          # Cycle to next mode
+          - action: input_select.select_next
+            target:
+              entity_id: !input mode_selector
+          # Update display based on new mode
+          - choose:
+              # Entering hvac_set mode — show setpoint, start flash
+              - conditions:
+                  - condition: template
+                    value_template: "{{ states(mode_selector) == 'hvac_set' }}"
+                sequence:
+                  - action: number.set_value
+                    target:
+                      entity_id: "{{ external_temp_entity }}"
+                    data:
+                      value: "{{ state_attr(main_thermostat, 'temperature') | float }}"
+                  - if:
+                      - condition: template
+                        value_template: "{{ hvac_set_flash | bool }}"
+                    then:
+                      - repeat:
+                          while:
+                            - condition: template
+                              value_template: "{{ is_state(mode_timer, 'active') and states(mode_selector) == 'hvac_set' }}"
+                          sequence:
+                            - action: number.set_value
+                              target:
+                                entity_id: "{{ external_humi_entity }}"
+                              data:
+                                value: 0
+                            - delay:
+                                seconds: 1
+                            - action: number.set_value
+                              target:
+                                entity_id: "{{ external_humi_entity }}"
+                              data:
+                                value: 88
+                            - delay:
+                                seconds: 1
+              # Entering any other mode — restore real temp/humidity
+              - conditions:
+                  - condition: template
+                    value_template: "{{ states(mode_selector) != 'hvac_set' }}"
+                sequence:
+                  - if:
+                      - condition: template
+                        value_template: >-
+                          {{ states(external_temperature_sensor) not in ['unknown', 'unavailable', ''] }}
+                    then:
+                      - action: number.set_value
+                        target:
+                          entity_id: "{{ external_temp_entity }}"
+                        data:
+                          value: "{{ states(external_temperature_sensor) | float }}"
+                  - if:
+                      - condition: template
+                        value_template: >-
+                          {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                    then:
+                      - action: number.set_value
+                        target:
+                          entity_id: "{{ external_humi_entity }}"
+                        data:
+                          value: "{{ states(external_humidity_sensor) | float }}"
+
+      # ------------------------------------------------------------------ #
+      # BRANCH 3: + / - Button Presses                                     #
+      # Behavior depends on current mode                                    #
+      # ------------------------------------------------------------------ #
+      - conditions:
+          - condition: trigger
+            id:
+              - single_plus
+              - single_minus
+              - double_plus
+              - double_minus
+        sequence:
+          # Restart inactivity timer on any button press
+          - action: timer.start
+            target:
+              entity_id: !input mode_timer
+            data:
+              duration: "{{ mode_timeout }}"
+
+          - choose:
+            # -------------------- #
+            # HVAC SET MODE        #
+            # -------------------- #
+            - conditions:
+                - condition: template
+                  value_template: "{{ current_mode == 'hvac_set' }}"
+              sequence:
+                - choose:
+                    - conditions:
+                        - condition: trigger
+                          id: single_plus
+                      sequence:
+                        - action: climate.set_temperature
+                          target:
+                            entity_id: !input main_thermostat
+                          data:
+                            temperature: >-
+                              {{ (state_attr(main_thermostat, 'temperature') | float) + (hvac_setpoint_step_single | float) }}
+                    - conditions:
+                        - condition: trigger
+                          id: single_minus
+                      sequence:
+                        - action: climate.set_temperature
+                          target:
+                            entity_id: !input main_thermostat
+                          data:
+                            temperature: >-
+                              {{ (state_attr(main_thermostat, 'temperature') | float) - (hvac_setpoint_step_single | float) }}
+                    - conditions:
+                        - condition: trigger
+                          id: double_plus
+                      sequence:
+                        - action: climate.set_temperature
+                          target:
+                            entity_id: !input main_thermostat
+                          data:
+                            temperature: >-
+                              {{ (state_attr(main_thermostat, 'temperature') | float) + (hvac_setpoint_step_double | float) }}
+                    - conditions:
+                        - condition: trigger
+                          id: double_minus
+                      sequence:
+                        - action: climate.set_temperature
+                          target:
+                            entity_id: !input main_thermostat
+                          data:
+                            temperature: >-
+                              {{ (state_attr(main_thermostat, 'temperature') | float) - (hvac_setpoint_step_double | float) }}
+                # Update display to show new setpoint
+                - action: number.set_value
+                  target:
+                    entity_id: "{{ external_temp_entity }}"
+                  data:
+                    value: "{{ state_attr(main_thermostat, 'temperature') | float }}"
+
+            # -------------------- #
+            # CEILING FAN MODE     #
+            # -------------------- #
+            - conditions:
+                - condition: template
+                  value_template: "{{ current_mode == 'ceiling_fan' }}"
+              sequence:
+                - choose:
+                    - conditions:
+                        - condition: trigger
+                          id: single_plus
+                      sequence: !input ceiling_fan_single_plus
+                    - conditions:
+                        - condition: trigger
+                          id: single_minus
+                      sequence: !input ceiling_fan_single_minus
+                    - conditions:
+                        - condition: trigger
+                          id: double_plus
+                      sequence: !input ceiling_fan_double_plus
+                    - conditions:
+                        - condition: trigger
+                          id: double_minus
+                      sequence: !input ceiling_fan_double_minus
+
+            # -------------------- #
+            # CUSTOM MODE          #
+            # -------------------- #
+            - conditions:
+                - condition: template
+                  value_template: "{{ current_mode == 'custom' }}"
+              sequence:
+                - choose:
+                    - conditions:
+                        - condition: trigger
+                          id: single_plus
+                      sequence: !input custom_single_plus
+                    - conditions:
+                        - condition: trigger
+                          id: single_minus
+                      sequence: !input custom_single_minus
+                    - conditions:
+                        - condition: trigger
+                          id: double_plus
+                      sequence: !input custom_double_plus
+                    - conditions:
+                        - condition: trigger
+                          id: double_minus
+                      sequence: !input custom_double_minus
+
+      # ------------------------------------------------------------------ #
+      # BRANCH 4: Timer Expired — Return to default mode                   #
+      # ------------------------------------------------------------------ #
+      - conditions:
+          - condition: trigger
+            id: timer_expired
+        sequence:
+          - action: input_select.select_option
+            target:
+              entity_id: !input mode_selector
+            data:
+              option: "{{ default_mode }}"
+          # Restore real external temp/humidity display
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ states(external_temperature_sensor) not in ['unknown', 'unavailable', ''] }}
+            then:
+              - action: number.set_value
+                target:
+                  entity_id: "{{ external_temp_entity }}"
+                data:
+                  value: "{{ states(external_temperature_sensor) | float }}"
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+            then:
+              - action: number.set_value
+                target:
+                  entity_id: "{{ external_humi_entity }}"
+                data:
+                  value: "{{ states(external_humidity_sensor) | float }}"
+
+      # ------------------------------------------------------------------ #
+      # BRANCH 5: External Sensor Updates                                  #
+      # Only update display when NOT in hvac_set mode                      #
+      # ------------------------------------------------------------------ #
+      - conditions:
+          - condition: trigger
+            id:
+              - ext_temp
+              - ext_hum
+          - condition: template
+            value_template: "{{ current_mode != 'hvac_set' }}"
+        sequence:
+          - if:
+              - condition: trigger
+                id: ext_temp
+            then:
+              - if:
+                  - condition: template
+                    value_template: >-
+                      {{ states(external_temperature_sensor) not in ['unknown', 'unavailable'] }}
+                then:
+                  - action: number.set_value
+                    target:
+                      entity_id: "{{ external_temp_entity }}"
+                    data:
+                      value: "{{ states(external_temperature_sensor) | float }}"
+          - if:
+              - condition: trigger
+                id: ext_hum
+            then:
+              - if:
+                  - condition: template
+                    value_template: >-
+                      {{ states(external_humidity_sensor) not in ['unknown', 'unavailable'] }}
+                then:
+                  - action: number.set_value
+                    target:
+                      entity_id: "{{ external_humi_entity }}"
+                    data:
+                      value: "{{ states(external_humidity_sensor) | float }}"
+
+mode: parallel
+max: 10
