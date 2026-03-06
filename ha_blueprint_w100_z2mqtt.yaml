@@ -26,7 +26,7 @@ blueprint:
       name: W100 MQTT Topic
       description: >
         The MQTT topic for your W100 device as configured in Zigbee2MQTT.
-        Example: zigbee2mqtt/WD100-Device-Name
+        Example: zigbee2mqtt/Office-Climate-Controller
       default: zigbee2mqtt/<your_device_name>
       selector:
         text:
@@ -206,6 +206,7 @@ blueprint:
 # Variables
 # -------------------------
 variables:
+  mqtt_topic: !input mqtt_topic
   aqara_w100: !input aqara_w100
   main_thermostat: !input main_thermostat
   sync_direction: !input sync_direction
