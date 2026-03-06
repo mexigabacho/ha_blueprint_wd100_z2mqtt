@@ -264,10 +264,14 @@ actions:
       # BRANCH 1: Button Actions                                            #
       # Double press: always fires                                          #
       # Single press: only fires when thermostat mode is OFF               #
+      # Only proceeds when a real button action is present in the payload  #
       # ------------------------------------------------------------------ #
       - conditions:
           - condition: trigger
             id: button_action
+          - condition: template
+            value_template: >-
+              {{ trigger.payload_json.action not in [none, '', 'W100_PMTSD_request'] }}
         sequence:
           - choose:
               # --- Double Press Actions (always fire) ---
