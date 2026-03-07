@@ -148,6 +148,25 @@ blueprint:
           step: 1
           unit_of_measurement: seconds
 
+    double_center_reset:
+      name: Double Center Press Resets Mode
+      description: >
+        When enabled, double pressing the center button will immediately return
+        to the default mode and restore the display. When disabled, the
+        double_center_action will run instead.
+      default: true
+      selector:
+        boolean:
+
+    double_center_action:
+      name: Double Center Press Action
+      description: >
+        Action to run when center button is pressed twice.
+        Only used when Double Center Press Resets Mode is disabled.
+      default: []
+      selector:
+        action: {}
+
     # -------------------------
     # External Sensor Configuration
     # -------------------------
@@ -250,6 +269,7 @@ variables:
   hvac_setpoint_step_single: !input hvac_setpoint_step_single
   hvac_setpoint_step_double: !input hvac_setpoint_step_double
   hvac_display_delay: !input hvac_display_delay
+  double_center_reset: !input double_center_reset
   external_temperature_sensor: !input external_temperature_sensor
   external_humidity_sensor: !input external_humidity_sensor
   current_mode: "{{ states(mode_selector) }}"
@@ -323,41 +343,52 @@ actions:
   - choose:
 
       # ------------------------------------------------------------------ #
-      # BRANCH 1: Double Center — Return to default mode immediately        #
+      # BRANCH 1: Double Center                                             #
+      # If double_center_reset is true: return to default mode             #
+      # If double_center_reset is false: run user-defined action           #
       # ------------------------------------------------------------------ #
       - conditions:
           - condition: trigger
             id: double_center
         sequence:
-          - action: timer.cancel
-            target:
-              entity_id: !input mode_timer
-          - action: input_select.select_option
-            target:
-              entity_id: !input mode_selector
-            data:
-              option: "{{ default_mode }}"
-          # Restore real external temp/humidity display
           - if:
               - condition: template
-                value_template: >-
-                  {{ states(external_temperature_sensor) not in ['unknown', 'unavailable', ''] }}
+                value_template: "{{ double_center_reset | bool }}"
             then:
-              - action: number.set_value
+              - action: timer.cancel
                 target:
-                  entity_id: "{{ external_temp_entity }}"
-                data:
-                  value: "{{ states(external_temperature_sensor) | float }}"
-          - if:
-              - condition: template
-                value_template: >-
-                  {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
-            then:
-              - action: number.set_value
+                  entity_id: !input mode_timer
+              - action: input_select.select_option
                 target:
-                  entity_id: "{{ external_humi_entity }}"
+                  entity_id: !input mode_selector
                 data:
-                  value: "{{ states(external_humidity_sensor) | float }}"
+                  option: "{{ default_mode }}"
+              - if:
+                  - condition: template
+                    value_template: >-
+                      {{ states(external_temperature_sensor) not in ['unknown', 'unavailable', ''] }}
+                then:
+                  - action: number.set_value
+                    target:
+                      entity_id: "{{ external_temp_entity }}"
+                    data:
+                      value: "{{ states(external_temperature_sensor) | float }}"
+              - if:
+                  - condition: template
+                    value_template: >-
+                      {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                then:
+                  - action: number.set_value
+                    target:
+                      entity_id: "{{ external_humi_entity }}"
+                    data:
+                      value: "{{ states(external_humidity_sensor) | float }}"
+            else:
+              - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ true }}"
+                    sequence: !input double_center_action
 
       # ------------------------------------------------------------------ #
       # BRANCH 2: Single Center — Cycle to next mode                       #
