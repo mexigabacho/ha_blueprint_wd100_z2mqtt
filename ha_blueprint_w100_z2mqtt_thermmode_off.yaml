@@ -135,6 +135,19 @@ blueprint:
           step: 1
           unit_of_measurement: degrees
 
+    hvac_display_delay:
+      name: HVAC Set Display Delay
+      description: >
+        How long in seconds to show the new setpoint on the display after a
+        button press before restoring real temperature and humidity values.
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+          unit_of_measurement: seconds
+
     # -------------------------
     # External Sensor Configuration
     # -------------------------
@@ -236,6 +249,7 @@ variables:
   hvac_set_flash: !input hvac_set_flash
   hvac_setpoint_step_single: !input hvac_setpoint_step_single
   hvac_setpoint_step_double: !input hvac_setpoint_step_double
+  hvac_display_delay: !input hvac_display_delay
   external_temperature_sensor: !input external_temperature_sensor
   external_humidity_sensor: !input external_humidity_sensor
   current_mode: "{{ states(mode_selector) }}"
@@ -468,16 +482,32 @@ actions:
                             entity_id: "{{ external_temp_entity }}"
                           data:
                             value: "{{ new_setpoint }}"
+                        - delay:
+                            seconds: "{{ hvac_display_delay }}"
                         - if:
                             - condition: template
-                              value_template: >-
-                                {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                              value_template: "{{ states(mode_selector) == 'hvac_set' }}"
                           then:
-                            - action: number.set_value
-                              target:
-                                entity_id: "{{ external_humi_entity }}"
-                              data:
-                                value: "{{ states(external_humidity_sensor) | float }}"
+                            - if:
+                                - condition: template
+                                  value_template: >-
+                                    {{ states(external_temperature_sensor) not in ['unknown', 'unavailable', ''] }}
+                              then:
+                                - action: number.set_value
+                                  target:
+                                    entity_id: "{{ external_temp_entity }}"
+                                  data:
+                                    value: "{{ states(external_temperature_sensor) | float }}"
+                            - if:
+                                - condition: template
+                                  value_template: >-
+                                    {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                              then:
+                                - action: number.set_value
+                                  target:
+                                    entity_id: "{{ external_humi_entity }}"
+                                  data:
+                                    value: "{{ states(external_humidity_sensor) | float }}"
                     - conditions:
                         - condition: trigger
                           id: single_minus
@@ -495,16 +525,32 @@ actions:
                             entity_id: "{{ external_temp_entity }}"
                           data:
                             value: "{{ new_setpoint }}"
+                        - delay:
+                            seconds: "{{ hvac_display_delay }}"
                         - if:
                             - condition: template
-                              value_template: >-
-                                {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                              value_template: "{{ states(mode_selector) == 'hvac_set' }}"
                           then:
-                            - action: number.set_value
-                              target:
-                                entity_id: "{{ external_humi_entity }}"
-                              data:
-                                value: "{{ states(external_humidity_sensor) | float }}"
+                            - if:
+                                - condition: template
+                                  value_template: >-
+                                    {{ states(external_temperature_sensor) not in ['unknown', 'unavailable', ''] }}
+                              then:
+                                - action: number.set_value
+                                  target:
+                                    entity_id: "{{ external_temp_entity }}"
+                                  data:
+                                    value: "{{ states(external_temperature_sensor) | float }}"
+                            - if:
+                                - condition: template
+                                  value_template: >-
+                                    {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                              then:
+                                - action: number.set_value
+                                  target:
+                                    entity_id: "{{ external_humi_entity }}"
+                                  data:
+                                    value: "{{ states(external_humidity_sensor) | float }}"
                     - conditions:
                         - condition: trigger
                           id: double_plus
@@ -522,16 +568,32 @@ actions:
                             entity_id: "{{ external_temp_entity }}"
                           data:
                             value: "{{ new_setpoint }}"
+                        - delay:
+                            seconds: "{{ hvac_display_delay }}"
                         - if:
                             - condition: template
-                              value_template: >-
-                                {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                              value_template: "{{ states(mode_selector) == 'hvac_set' }}"
                           then:
-                            - action: number.set_value
-                              target:
-                                entity_id: "{{ external_humi_entity }}"
-                              data:
-                                value: "{{ states(external_humidity_sensor) | float }}"
+                            - if:
+                                - condition: template
+                                  value_template: >-
+                                    {{ states(external_temperature_sensor) not in ['unknown', 'unavailable', ''] }}
+                              then:
+                                - action: number.set_value
+                                  target:
+                                    entity_id: "{{ external_temp_entity }}"
+                                  data:
+                                    value: "{{ states(external_temperature_sensor) | float }}"
+                            - if:
+                                - condition: template
+                                  value_template: >-
+                                    {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                              then:
+                                - action: number.set_value
+                                  target:
+                                    entity_id: "{{ external_humi_entity }}"
+                                  data:
+                                    value: "{{ states(external_humidity_sensor) | float }}"
                     - conditions:
                         - condition: trigger
                           id: double_minus
@@ -549,16 +611,32 @@ actions:
                             entity_id: "{{ external_temp_entity }}"
                           data:
                             value: "{{ new_setpoint }}"
+                        - delay:
+                            seconds: "{{ hvac_display_delay }}"
                         - if:
                             - condition: template
-                              value_template: >-
-                                {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                              value_template: "{{ states(mode_selector) == 'hvac_set' }}"
                           then:
-                            - action: number.set_value
-                              target:
-                                entity_id: "{{ external_humi_entity }}"
-                              data:
-                                value: "{{ states(external_humidity_sensor) | float }}"
+                            - if:
+                                - condition: template
+                                  value_template: >-
+                                    {{ states(external_temperature_sensor) not in ['unknown', 'unavailable', ''] }}
+                              then:
+                                - action: number.set_value
+                                  target:
+                                    entity_id: "{{ external_temp_entity }}"
+                                  data:
+                                    value: "{{ states(external_temperature_sensor) | float }}"
+                            - if:
+                                - condition: template
+                                  value_template: >-
+                                    {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                              then:
+                                - action: number.set_value
+                                  target:
+                                    entity_id: "{{ external_humi_entity }}"
+                                  data:
+                                    value: "{{ states(external_humidity_sensor) | float }}"
 
             # -------------------- #
             # CEILING FAN MODE     #
