@@ -468,6 +468,16 @@ actions:
                             entity_id: "{{ external_temp_entity }}"
                           data:
                             value: "{{ new_setpoint }}"
+                        - if:
+                            - condition: template
+                              value_template: >-
+                                {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                          then:
+                            - action: number.set_value
+                              target:
+                                entity_id: "{{ external_humi_entity }}"
+                              data:
+                                value: "{{ states(external_humidity_sensor) | float }}"
                     - conditions:
                         - condition: trigger
                           id: single_minus
@@ -485,6 +495,16 @@ actions:
                             entity_id: "{{ external_temp_entity }}"
                           data:
                             value: "{{ new_setpoint }}"
+                        - if:
+                            - condition: template
+                              value_template: >-
+                                {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                          then:
+                            - action: number.set_value
+                              target:
+                                entity_id: "{{ external_humi_entity }}"
+                              data:
+                                value: "{{ states(external_humidity_sensor) | float }}"
                     - conditions:
                         - condition: trigger
                           id: double_plus
@@ -502,6 +522,16 @@ actions:
                             entity_id: "{{ external_temp_entity }}"
                           data:
                             value: "{{ new_setpoint }}"
+                        - if:
+                            - condition: template
+                              value_template: >-
+                                {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                          then:
+                            - action: number.set_value
+                              target:
+                                entity_id: "{{ external_humi_entity }}"
+                              data:
+                                value: "{{ states(external_humidity_sensor) | float }}"
                     - conditions:
                         - condition: trigger
                           id: double_minus
@@ -519,6 +549,16 @@ actions:
                             entity_id: "{{ external_temp_entity }}"
                           data:
                             value: "{{ new_setpoint }}"
+                        - if:
+                            - condition: template
+                              value_template: >-
+                                {{ states(external_humidity_sensor) not in ['unknown', 'unavailable', ''] }}
+                          then:
+                            - action: number.set_value
+                              target:
+                                entity_id: "{{ external_humi_entity }}"
+                              data:
+                                value: "{{ states(external_humidity_sensor) | float }}"
 
             # -------------------- #
             # CEILING FAN MODE     #
