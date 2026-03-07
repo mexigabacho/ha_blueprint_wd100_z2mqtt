@@ -455,48 +455,70 @@ actions:
                         - condition: trigger
                           id: single_plus
                       sequence:
+                        - variables:
+                            new_setpoint: >-
+                              {{ (state_attr(main_thermostat, 'temperature') | float) + (hvac_setpoint_step_single | float) }}
                         - action: climate.set_temperature
                           target:
                             entity_id: !input main_thermostat
                           data:
-                            temperature: >-
-                              {{ (state_attr(main_thermostat, 'temperature') | float) + (hvac_setpoint_step_single | float) }}
+                            temperature: "{{ new_setpoint }}"
+                        - action: number.set_value
+                          target:
+                            entity_id: "{{ external_temp_entity }}"
+                          data:
+                            value: "{{ new_setpoint }}"
                     - conditions:
                         - condition: trigger
                           id: single_minus
                       sequence:
+                        - variables:
+                            new_setpoint: >-
+                              {{ (state_attr(main_thermostat, 'temperature') | float) - (hvac_setpoint_step_single | float) }}
                         - action: climate.set_temperature
                           target:
                             entity_id: !input main_thermostat
                           data:
-                            temperature: >-
-                              {{ (state_attr(main_thermostat, 'temperature') | float) - (hvac_setpoint_step_single | float) }}
+                            temperature: "{{ new_setpoint }}"
+                        - action: number.set_value
+                          target:
+                            entity_id: "{{ external_temp_entity }}"
+                          data:
+                            value: "{{ new_setpoint }}"
                     - conditions:
                         - condition: trigger
                           id: double_plus
                       sequence:
+                        - variables:
+                            new_setpoint: >-
+                              {{ (state_attr(main_thermostat, 'temperature') | float) + (hvac_setpoint_step_double | float) }}
                         - action: climate.set_temperature
                           target:
                             entity_id: !input main_thermostat
                           data:
-                            temperature: >-
-                              {{ (state_attr(main_thermostat, 'temperature') | float) + (hvac_setpoint_step_double | float) }}
+                            temperature: "{{ new_setpoint }}"
+                        - action: number.set_value
+                          target:
+                            entity_id: "{{ external_temp_entity }}"
+                          data:
+                            value: "{{ new_setpoint }}"
                     - conditions:
                         - condition: trigger
                           id: double_minus
                       sequence:
+                        - variables:
+                            new_setpoint: >-
+                              {{ (state_attr(main_thermostat, 'temperature') | float) - (hvac_setpoint_step_double | float) }}
                         - action: climate.set_temperature
                           target:
                             entity_id: !input main_thermostat
                           data:
-                            temperature: >-
-                              {{ (state_attr(main_thermostat, 'temperature') | float) - (hvac_setpoint_step_double | float) }}
-                # Update display to show new setpoint
-                - action: number.set_value
-                  target:
-                    entity_id: "{{ external_temp_entity }}"
-                  data:
-                    value: "{{ state_attr(main_thermostat, 'temperature') | float }}"
+                            temperature: "{{ new_setpoint }}"
+                        - action: number.set_value
+                          target:
+                            entity_id: "{{ external_temp_entity }}"
+                          data:
+                            value: "{{ new_setpoint }}"
 
             # -------------------- #
             # CEILING FAN MODE     #
