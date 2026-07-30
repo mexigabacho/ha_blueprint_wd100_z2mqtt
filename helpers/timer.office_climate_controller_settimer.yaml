@@ -1,0 +1,6 @@
+# Reference only -- Home Assistant has no YAML-paste import for helpers.
+# Re-create manually via Settings > Devices & Services > Helpers > Create Helper.
+name: office_climate_controller_settimer
+icon: mdi:timer
+duration: "0:00:00"
+restore: false

@@ -1,0 +1,8 @@
+# Reference only -- Home Assistant has no YAML-paste import for helpers.
+# Re-create manually via Settings > Devices & Services > Helpers > Create Helper.
+name: office_climate_controller_mode
+icon: mdi:thermostat-cog
+options:
+  - ceiling_fan
+  - hvac_set
+  - custom

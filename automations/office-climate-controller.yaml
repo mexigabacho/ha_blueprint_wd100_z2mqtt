@@ -1,0 +1,44 @@
+alias: Office-Climate-Controller-Buttons
+description: ''
+use_blueprint:
+  path: mexigabacho/ha_blueprint_w100_z2mqtt_thermmode_off.yaml
+  input:
+    mqtt_topic: zigbee2mqtt/Office-Climate-Controller
+    aqara_w100: climate.office_climate_controller
+    main_thermostat: climate.living_room
+    mode_selector: input_select.office_climate_controller_mode
+    mode_timer: timer.office_climate_controller_settimer
+    hvac_setpoint_step_double: 3
+    external_temperature_sensor: sensor.living_room_temperature
+    external_humidity_sensor: sensor.living_room_humidity
+    ceiling_fan_single_plus:
+    - action: fan.increase_speed
+      metadata: {}
+      target:
+        entity_id: fan.office_fan
+      data: {}
+    ceiling_fan_single_minus:
+    - action: fan.decrease_speed
+      metadata: {}
+      target:
+        entity_id: fan.office_fan
+      data: {}
+    ceiling_fan_double_plus:
+    - action: fan.turn_on
+      metadata: {}
+      target:
+        entity_id: fan.office_fan
+      data: {}
+    ceiling_fan_double_minus:
+    - action: fan.turn_off
+      metadata: {}
+      target:
+        entity_id: fan.office_fan
+      data: {}
+    double_center_reset: false
+    double_center_action:
+    - action: fan.toggle
+      metadata: {}
+      target:
+        entity_id: fan.office_fan
+      data: {}

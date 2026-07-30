@@ -1,0 +1,8 @@
+# Local scratch space for MQTT captures, credential dumps, etc. -- never commit these
+*.local.*
+*.secret.*
+mqtt-capture*.log
+*.env
+
+# OS/editor noise
+.DS_Store
